@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -74,10 +75,11 @@ func New(opts ...Option) *Client {
 func (c *Client) IPv4() (net.IP, Errors) {
 	var errs Errors
 	for _, providerURL := range []string{
-		"https://ipv4.nsupdate.info/myip",
-		"https://v4.ident.me",
-		"https://ipv4.yunohost.org",
-		"https://ipv4.wtfismyip.com/text",
+		// "https://ipv4.nsupdate.info/myip",
+		// "https://v4.ident.me",
+		// "https://ipv4.yunohost.org",
+		// "https://ipv4.wtfismyip.com/text",
+		"https://checkip.synology.com",
 	} {
 		ip, err := c.getIP(providerURL, false)
 		if err != nil {
@@ -102,10 +104,11 @@ func (c *Client) IPv4() (net.IP, Errors) {
 func (c *Client) IPv6() (net.IP, Errors) {
 	var errs Errors
 	for _, providerURL := range []string{
-		"https://ipv6.nsupdate.info/myip",
-		"https://v6.ident.me",
-		"https://ipv6.yunohost.org",
-		"https://ipv6.wtfismyip.com/text",
+		// "https://ipv6.nsupdate.info/myip",
+		// "https://v6.ident.me",
+		// "https://ipv6.yunohost.org",
+		// "https://ipv6.wtfismyip.com/text",
+		"https://checkipv6.synology.com",
 	} {
 		ip, err := c.getIP(providerURL, true)
 		if err != nil {
@@ -157,6 +160,26 @@ func (c *Client) getIP(providerURL string, v6 bool) (net.IP, error) {
 		return nil, errors.Errorf("received invalid status code %d from %s: %s", res.StatusCode, providerURL, res.Body)
 	}
 
+	// Regex patterns for IPv4 and IPv6
+	// ipv4Pattern := `(\d{1,3}\.){3}\d{1,3}`
+	// ipv6Pattern := `([a-fA-F0-9:]+:+)+[a-fA-F0-9]+`
+	ipv4Pattern := `([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])\.([01]?[0-9]?[0-9]|2[0-4][0-9]|25[0-5])`
+	ipv6Pattern := `(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))`
+
+	var ipStr string
+	if v6 {
+		re := regexp.MustCompile(ipv6Pattern)
+		ipStr = re.FindString(body)
+	} else {
+		re := regexp.MustCompile(ipv4Pattern)
+		ipStr = re.FindString(body)
+	}
+
+	if ipStr == "" {
+		return nil, errors.New("no valid IP address found in response")
+	}
+
+	ip := net.ParseIP(strings.TrimSpace(ipStr))
 	return net.ParseIP(string(ip)), nil
 }
 
